@@ -90,13 +90,27 @@ func doActions(actions []Actions, domain string, address string, ttl uint32) {
 				log.Error(text)
 			}*/
 			log.Printf("terminal not implement: %s %s %d", domain, address, ttl)
+			if len(action.Actionsr) != 0 {
+				doActions(action.Actionsr, domain, address, ttl)
+			}
 		case "rest-get":
 			url := formatTemplate(action.URL, &VarTemplate{Domain: domain, Address: address, Ttl: ttl})
 			_, err := http.Get(url)
 			if err != nil {
 				log.Printf("ERROR get: %s", err)
 			}
-			//log.Printf("rest-get not implement: %s %s %d", domain, address, ttl)
+			if len(action.Actionsr) != 0 {
+				doActions(action.Actionsr, domain, address, ttl)
+			}
+		case "log":
+			str := formatTemplate("{{.Domain}} {{.Address}} {{.Ttl}}", &VarTemplate{Domain: domain, Address: address, Ttl: ttl})
+			if len(action.STR) != 0 {
+				str = formatTemplate(action.STR, &VarTemplate{Domain: domain, Address: address, Ttl: ttl})
+			}
+			log.Println(str)
+			if len(action.Actionsr) != 0 {
+				doActions(action.Actionsr, domain, address, ttl)
+			}
 		}
 	}
 }

@@ -17,8 +17,14 @@ import (
 				"A": ["1.2.3.4", "5.6.7.8"],
 				"actions" : [
 								{
-									"type" : "rest-get",
-									"url" : "http:example.com/api?domain={{.Domain}}&address={{.Address}}&ttl={{.Ttl}}"
+									"type" : "log",
+									"format" : ""
+									"actions" : [
+										{
+											"type" : "rest-get",
+											"url" : "http:example.com/api?domain={{.Domain}}&address={{.Address}}&ttl={{.Ttl}}"
+										}
+									]
 								}
 							]
 			},
@@ -50,9 +56,15 @@ type Config struct {
 	Server Server `json:"server"`
 }
 type Actions struct {
-	Type string `json:"type"`
-	Cmd  string `json:"cmd,omitempty"`
-	URL  string `json:"url,omitempty"`
+	//может быть у любого
+	Type     string    `json:"type"`
+	Actionsr []Actions `json:"actions,omitempty"`
+	//terminal
+	Cmd string `json:"cmd,omitempty"`
+	//rest-get
+	URL string `json:"url,omitempty"`
+	//log
+	STR string `json:"str,omitempty"`
 }
 type Targets struct {
 	A       []string  `json:"A,omitempty"`
