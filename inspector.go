@@ -13,36 +13,14 @@ func isPoisoned(ans *dns.Msg, targets []Targets) bool {
 	for _, target := range targets {
 		//A records
 		if len(target.A) != 0 {
-			for _, rr := range ans.Answer {
-				if rr.Header().Rrtype == dns.TypeA {
-					if isMatch(target.A, &rr) {
-						return true
-					}
-				}
-			}
-			for _, rr := range ans.Extra {
-				if rr.Header().Rrtype == dns.TypeA {
-					if isMatch(target.A, &rr) {
-						return true
-					}
-				}
+			if isPoison(target.A, ans, dns.TypeA) {
+				return true
 			}
 		}
 		//AAAA records
 		if len(target.AAAA) != 0 {
-			for _, rr := range ans.Answer {
-				if rr.Header().Rrtype == dns.TypeAAAA {
-					if isMatch(target.AAAA, &rr) {
-						return true
-					}
-				}
-			}
-			for _, rr := range ans.Extra {
-				if rr.Header().Rrtype == dns.TypeAAAA {
-					if isMatch(target.AAAA, &rr) {
-						return true
-					}
-				}
+			if isPoison(target.AAAA, ans, dns.TypeAAAA) {
+				return true
 			}
 		}
 	}
@@ -50,7 +28,27 @@ func isPoisoned(ans *dns.Msg, targets []Targets) bool {
 	return false
 }
 
-func isMatch(targets []string, rr *dns.RR) bool {
+// Проверка по списку адресов с указанием конкретного типа
+func isPoison(targets []string, ans *dns.Msg, dnstype uint16) bool {
+	for _, rr := range ans.Answer {
+		if rr.Header().Rrtype == dnstype {
+			if isMatchRecord(targets, &rr) {
+				return true
+			}
+		}
+	}
+	for _, rr := range ans.Extra {
+		if rr.Header().Rrtype == dnstype {
+			if isMatchRecord(targets, &rr) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Проверка по списку
+func isMatchRecord(targets []string, rr *dns.RR) bool {
 	for i := 1; i == dns.NumField(*rr); i++ {
 		ip := dns.Field(*rr, i)
 		if contains(targets, ip) {
@@ -60,22 +58,53 @@ func isMatch(targets []string, rr *dns.RR) bool {
 	return false
 }
 
+type Record struct {
+	Domain  string
+	RecType uint16
+	Address string
+	Ttl     uint32
+}
+
+// see dnstype dns.Type
+func collectAnswers(ans *dns.Msg, dnstype uint16) []Record {
+	/*tmpData := new(Data)
+	tmpData.RecType = dnstype
+	tmpData.Domain = ans.Question[0].Name*/
+	recSlice := make([]Record, 0)
+
+	for _, rr := range ans.Answer {
+		if rr.Header().Rrtype == dnstype {
+			for i := 1; i <= dns.NumField(rr); i++ {
+				recSlice = append(recSlice, Record{Domain: "", Address: dns.Field(rr, i), Ttl: rr.Header().Ttl})
+			}
+		}
+	}
+	for _, rr := range ans.Extra {
+		if rr.Header().Rrtype == dnstype {
+			for i := 1; i <= dns.NumField(rr); i++ {
+				recSlice = append(recSlice, Record{Address: dns.Field(rr, i), Ttl: rr.Header().Ttl})
+			}
+		}
+	}
+
+	//tmpData.Records = recSlice
+	return recSlice
+}
+
 func runActions(ans *dns.Msg, targets []Targets) {
 	for _, target := range targets {
 		if len(target.A) != 0 {
-			for _, rr := range ans.Answer {
-				if rr.Header().Rrtype == dns.TypeA {
-					for i := 1; i <= dns.NumField(rr); i++ {
-						doActions(target.Actions, ans.Question[0].Name, dns.Field(rr, i), rr.Header().Ttl)
-					}
-
-				}
-			}
+			data := collectAnswers(ans, dns.TypeA)
+			doActions(target.Actions, data)
 		}
 	}
 }
 
-func doActions(actions []Actions, domain string, address string, ttl uint32) {
+func doActions(actions []Actions, data Data) {
+	if len(data.Records) == 0 {
+		return
+	}
+
 	for _, action := range actions {
 		switch action.Type {
 		case "terminal":
@@ -89,27 +118,32 @@ func doActions(actions []Actions, domain string, address string, ttl uint32) {
 				text := "runCommand: " + fmt.Sprint(err) + ": " + stderr.String()
 				log.Error(text)
 			}*/
-			log.Printf("terminal not implement: %s %s %d", domain, address, ttl)
+			//log.Printf("terminal not implement: %s %s %d", domain, address, ttl)
 			if len(action.Actionsr) != 0 {
-				doActions(action.Actionsr, domain, address, ttl)
+				doActions(action.Actionsr, data)
 			}
 		case "rest-get":
-			url := formatTemplate(action.URL, &VarTemplate{Domain: domain, Address: address, Ttl: ttl})
-			_, err := http.Get(url)
-			if err != nil {
-				log.Printf("ERROR get: %s", err)
+			for _, rec := range data.Records {
+				url := formatTemplate(action.URL, &VarTemplate{Domain: data.Domain, Address: rec.Address, Ttl: rec.Ttl})
+				_, err := http.Get(url)
+				if err != nil {
+					log.Printf("ERROR rest-get: %s", err)
+				}
 			}
 			if len(action.Actionsr) != 0 {
-				doActions(action.Actionsr, domain, address, ttl)
+				doActions(action.Actionsr, data)
 			}
 		case "log":
-			str := formatTemplate("{{.Domain}} {{.Address}} {{.Ttl}}", &VarTemplate{Domain: domain, Address: address, Ttl: ttl})
-			if len(action.STR) != 0 {
-				str = formatTemplate(action.STR, &VarTemplate{Domain: domain, Address: address, Ttl: ttl})
+			//Просто вывести в лог содержимое записей
+			for _, rec := range data.Records {
+				str := formatTemplate("{{.Domain}} {{.Address}} {{.Ttl}}", &VarTemplate{Domain: data.Domain, Address: rec.Address, Ttl: rec.Ttl})
+				if len(action.STR) != 0 {
+					str = formatTemplate(action.STR, &VarTemplate{Domain: data.Domain, Address: rec.Address, Ttl: rec.Ttl})
+				}
+				log.Println(str)
 			}
-			log.Println(str)
 			if len(action.Actionsr) != 0 {
-				doActions(action.Actionsr, domain, address, ttl)
+				doActions(action.Actionsr, data)
 			}
 		}
 	}

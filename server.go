@@ -30,7 +30,7 @@ func ServerHandler(config Config) Handler {
 		c := new(dns.Client)
 		c.Net = "udp"
 		//Запрос через плохой ns сервер
-		nameserver_bad := config.Server.DNSbad[randGen.Intn(len(config.Server.DNSbad))]
+		nameserver_bad := config.Server.UpstreamBad[randGen.Intn(len(config.Server.UpstreamBad))]
 		resp_bad, rtt_bad, has_err := resolve(w, req, c, nameserver_bad)
 		if !has_err {
 			if !isPoisoned(resp_bad, config.Server.Targets) {
@@ -42,7 +42,7 @@ func ServerHandler(config Config) Handler {
 
 			} else {
 				//Совпадение. Делаем запрос через доверенные сервера, если все хорошо то засылаем ответ
-				nameserver_good := config.Server.DNSgood[randGen.Intn(len(config.Server.DNSgood))]
+				nameserver_good := config.Server.UpstreamGood[randGen.Intn(len(config.Server.UpstreamGood))]
 				resp_good, rtt_good, has_err_good := resolve(w, req, c, nameserver_good)
 				if !has_err_good {
 					//Ошибок нет. Отправляем ответ и выполняем actions
@@ -56,6 +56,49 @@ func ServerHandler(config Config) Handler {
 		}
 
 	} // end of handler
+}
+
+func resolveNew(w dns.ResponseWriter, req *dns.Msg, configs Server) (r *dns.Msg, rtt time.Duration, hasError bool) {
+	strategy := "random"
+	resp := new(dns.Msg)
+	rttime := new(time.Duration)
+	err := nil
+	if len(configs.UpstreamStrategy) != 0 {
+		strategy = configs.UpstreamStrategy
+	}
+	switch strategy {
+	case "random":
+		{
+			resolveRandom
+		}
+	default:
+		{
+
+		}
+	}
+	switch {
+	case err != nil:
+		log.Printf("ERROR: %s %s\n", ns, err.Error())
+		sendFailure(w, req)
+		return resp, rtt, true
+	case req.Id != resp.Id:
+		log.Printf("ERROR: %s Id mismatch: %v != %v\n", ns, req.Id, resp.Id)
+		sendFailure(w, req)
+		return resp, rtt, true
+	}
+	return resp, rtt, false
+}
+
+// Запрос через 1 случайный upstream
+// Ошибка req.Id != resp.Id  log.Printf("ERROR: %s Id mismatch: %v != %v\n", ns, req.Id, resp.Id)
+// Ошибка err != nil: log.Printf("ERROR: %s %s\n", ns, err.Error())
+func resolveRandom(req *dns.Msg, nameservers []string) (r *dns.Msg, rtt time.Duration, err error) {
+	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
+	c := new(dns.Client)
+	c.Net = "udp"
+	//Запрос через плохой ns сервер
+	ns := nameservers[randGen.Intn(len(nameservers))]
+	return c.Exchange(req, ns)
 }
 
 func resolve(w dns.ResponseWriter, req *dns.Msg, client *dns.Client, ns string) (r *dns.Msg, rtt time.Duration, hasError bool) {

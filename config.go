@@ -72,8 +72,9 @@ type Targets struct {
 	Actions []Actions `json:"actions"`
 }
 type Server struct {
-	DNSbad  []string `json:"dns_bad"`
-	DNSgood []string `json:"dns_good"`
+	UpstreamBad      []string `json:"upstream_bad"`
+	UpstreamGood     []string `json:"upstream_good"`
+	UpstreamStrategy string   `json:"upstream_strategy,omitempty"`
 	//	IgnoreDomains []string `json:"ignore_domains,omitempty"`
 	Targets []Targets `json:"targets"`
 }
@@ -90,10 +91,10 @@ func ReadConfig(filename string) Config {
 	}
 
 	// Safety checks
-	if len(jsonConfig.Server.DNSgood) == 0 {
+	if len(jsonConfig.Server.UpstreamGood) == 0 {
 		log.Fatal("Configuration contains no 'dns_good' section")
 	}
-	if len(jsonConfig.Server.DNSbad) == 0 {
+	if len(jsonConfig.Server.UpstreamBad) == 0 {
 		log.Fatal("Configuration contains no 'dns_bad' section")
 	}
 	return jsonConfig
