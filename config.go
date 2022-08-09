@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"sync"
 )
 
 /*
@@ -71,15 +72,20 @@ type Targets struct {
 	AAAA    []string  `json:"AAAA,omitempty"`
 	Actions []Actions `json:"actions"`
 }
+type Upstream struct {
+	NServers     []string   `json:"ns"`
+	Strategy     string     `json:"strategy,omitempty"`
+	CycleMutex   sync.Mutex // mytex для циклической стратегии
+	CycleCurrent int        // указатель на текущий сервер для циклической стратегии
+}
 type Server struct {
-	UpstreamBad      []string `json:"upstream_bad"`
-	UpstreamGood     []string `json:"upstream_good"`
-	UpstreamStrategy string   `json:"upstream_strategy,omitempty"`
+	UpstreamBad  Upstream `json:"upstream_bad"`
+	UpstreamGood Upstream `json:"upstream_good"`
 	//	IgnoreDomains []string `json:"ignore_domains,omitempty"`
 	Targets []Targets `json:"targets"`
 }
 
-func ReadConfig(filename string) Config {
+func ReadConfig(filename string) *Config {
 	file, err := ioutil.ReadFile(filename)
 	if err != nil {
 		log.Fatalf("Can't open config file: %s", err.Error())
@@ -91,11 +97,11 @@ func ReadConfig(filename string) Config {
 	}
 
 	// Safety checks
-	if len(jsonConfig.Server.UpstreamGood) == 0 {
+	/*if len(jsonConfig.Server.UpstreamGood) == 0 {
 		log.Fatal("Configuration contains no 'dns_good' section")
 	}
 	if len(jsonConfig.Server.UpstreamBad) == 0 {
 		log.Fatal("Configuration contains no 'dns_bad' section")
-	}
-	return jsonConfig
+	}*/
+	return &jsonConfig
 }

@@ -100,8 +100,8 @@ func runActions(ans *dns.Msg, targets []Targets) {
 	}
 }
 
-func doActions(actions []Actions, data Data) {
-	if len(data.Records) == 0 {
+func doActions(actions []Actions, recs []Record) {
+	if len(recs) == 0 {
 		return
 	}
 
@@ -120,30 +120,30 @@ func doActions(actions []Actions, data Data) {
 			}*/
 			//log.Printf("terminal not implement: %s %s %d", domain, address, ttl)
 			if len(action.Actionsr) != 0 {
-				doActions(action.Actionsr, data)
+				doActions(action.Actionsr, recs)
 			}
 		case "rest-get":
-			for _, rec := range data.Records {
-				url := formatTemplate(action.URL, &VarTemplate{Domain: data.Domain, Address: rec.Address, Ttl: rec.Ttl})
+			for _, rec := range recs {
+				url := formatTemplate(action.URL, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl})
 				_, err := http.Get(url)
 				if err != nil {
 					log.Printf("ERROR rest-get: %s", err)
 				}
 			}
 			if len(action.Actionsr) != 0 {
-				doActions(action.Actionsr, data)
+				doActions(action.Actionsr, recs)
 			}
 		case "log":
 			//Просто вывести в лог содержимое записей
-			for _, rec := range data.Records {
-				str := formatTemplate("{{.Domain}} {{.Address}} {{.Ttl}}", &VarTemplate{Domain: data.Domain, Address: rec.Address, Ttl: rec.Ttl})
+			for _, rec := range recs {
+				str := formatTemplate("{{.Domain}} {{.Address}} {{.Ttl}}", &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl})
 				if len(action.STR) != 0 {
-					str = formatTemplate(action.STR, &VarTemplate{Domain: data.Domain, Address: rec.Address, Ttl: rec.Ttl})
+					str = formatTemplate(action.STR, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl})
 				}
 				log.Println(str)
 			}
 			if len(action.Actionsr) != 0 {
-				doActions(action.Actionsr, data)
+				doActions(action.Actionsr, recs)
 			}
 		}
 	}
