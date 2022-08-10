@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/miekg/dns"
-	"koozz.ru/antidote"
+	"github.com/Jamakasi/antidote"
 )
 
 // cmd args

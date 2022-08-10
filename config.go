@@ -2,8 +2,8 @@ package antidote
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
+	"os"
 	"sync"
 )
 
@@ -56,21 +56,26 @@ type VarTemplate struct {
 type Config struct {
 	Server Server `json:"server"`
 }
-type Actions struct {
+type Action struct {
 	//может быть у любого
-	Type     string    `json:"type"`
-	Actionsr []Actions `json:"actions,omitempty"`
+	Type    string   `json:"type"`
+	Actions []Action `json:"actions,omitempty"`
 	//terminal
 	Cmd string `json:"cmd,omitempty"`
-	//rest-get
-	URL string `json:"url,omitempty"`
 	//log
 	STR string `json:"str,omitempty"`
+	//rest
+	HttpMethod         string `json:"method,omitempty"`
+	HttpSkipTls        bool   `json:"skiptls,omitempty"`
+	HttpBasicAuthLogin string `json:"login,omitempty"`
+	HttpBasicAuthPass  string `json:"password,omitempty"`
+	Data               string `json:"data,omitempty"`
+	URL                string `json:"url,omitempty"`
 }
 type Targets struct {
-	A       []string  `json:"A,omitempty"`
-	AAAA    []string  `json:"AAAA,omitempty"`
-	Actions []Actions `json:"actions"`
+	A       []string `json:"A,omitempty"`
+	AAAA    []string `json:"AAAA,omitempty"`
+	Actions []Action `json:"actions"`
 }
 type Upstream struct {
 	NServers     []string   `json:"ns"`
@@ -79,14 +84,13 @@ type Upstream struct {
 	CycleCurrent int        // указатель на текущий сервер для циклической стратегии
 }
 type Server struct {
-	UpstreamBad  Upstream `json:"upstream_bad"`
-	UpstreamGood Upstream `json:"upstream_good"`
-	//	IgnoreDomains []string `json:"ignore_domains,omitempty"`
-	Targets []Targets `json:"targets"`
+	UpstreamBad  Upstream  `json:"upstream_bad"`
+	UpstreamGood Upstream  `json:"upstream_good"`
+	Targets      []Targets `json:"targets"`
 }
 
 func ReadConfig(filename string) *Config {
-	file, err := ioutil.ReadFile(filename)
+	file, err := os.ReadFile(filename)
 	if err != nil {
 		log.Fatalf("Can't open config file: %s", err.Error())
 	}

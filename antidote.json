@@ -16,16 +16,20 @@
 			"type" : "log",
 			"str" : "ololo {{.Domain}} {{.Address}} {{.Ttl}}",
 			"actions" : [
-			{
-				"type" : "log",
-				"str" : "no output",
-				"actions" : [
-					{
-						"type" : "rest-get",
-						"url" : "http://127.0.0.1/api?domain={{.Domain}}&address={{.Address}}&ttl={{.Ttl}}"
-					}
-				]
-			}
+				{
+				"type" : "rest",
+				"method" : "GET",
+				"url" : "http://127.0.0.1/api?domain={{.Domain}}&address={{.Address}}&ttl={{.Ttl}}"
+				},
+				{
+				"type" : "rest",
+				"skiptls": true,
+				"method" : "PUT",
+				"login" : "hide",
+				"password" : "hide",
+				"data" : "{\"address\":\"{{.Address}}\",\"comment\":\"{{.Domain}}\",\"list\": \"test-list\", \"timeout\":\"{{.Ttl}}\" }",
+				"url" : "https://192.168.88.1:4438/rest/ip/firewall/address-list"
+				}
 			]
 			}
 		]
