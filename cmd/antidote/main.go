@@ -31,6 +31,8 @@ func main() {
 	dns.HandleFunc(".", antidote.ServerHandler(configuration))
 
 	go startServer("udp", *listenAddr)
+	//FIXME ANY query work over tcp
+	go startServer("tcp", *listenAddr)
 
 	log.Printf("Started DNS server on: %s\n", *listenAddr)
 

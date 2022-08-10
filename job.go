@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -51,6 +52,10 @@ func (j *Job) RunActions(ans *dns.Msg, server *Server) {
 			data := j.collectAnswers(ans, dns.TypeA)
 			j.doActions(target.Actions, data)
 		}
+		if len(target.AAAA) != 0 {
+			data := j.collectAnswers(ans, dns.TypeAAAA)
+			j.doActions(target.Actions, data)
+		}
 	}
 }
 
@@ -60,6 +65,7 @@ func (j *Job) doActions(actions []Action, recs []Record) {
 	}
 
 	for _, action := range actions {
+		//log.Printf("Iteration action : %+v", action)
 		switch action.Type {
 		case "terminal":
 			/*cmd := exec.Command(*command, *fqdn, rec)
@@ -73,17 +79,6 @@ func (j *Job) doActions(actions []Action, recs []Record) {
 				log.Error(text)
 			}*/
 			//log.Printf("terminal not implement: %s %s %d", domain, address, ttl)
-			if len(action.Actions) != 0 {
-				j.doActions(action.Actions, recs)
-			}
-		case "rest-get":
-			for _, rec := range recs {
-				url := formatTemplate(action.URL, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl})
-				_, err := http.Get(url)
-				if err != nil {
-					log.Printf("ERROR rest-get: %s", err)
-				}
-			}
 			if len(action.Actions) != 0 {
 				j.doActions(action.Actions, recs)
 			}
@@ -103,16 +98,21 @@ func (j *Job) doActions(actions []Action, recs []Record) {
 }
 
 func jobLog(act Action, recs []Record) {
+	allAddreses := genAllAddress(recs)
 	for _, rec := range recs {
-		str := formatTemplate("{{.Domain}} {{.Address}} {{.Ttl}}", &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl})
+		str := formatTemplate("{{.Domain}} {{.Address}} {{.Ttl}}", &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl, AllAddress: allAddreses})
 		if len(act.STR) != 0 {
-			str = formatTemplate(act.STR, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl})
+			str = formatTemplate(act.STR, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl, AllAddress: allAddreses})
 		}
 		log.Println(str)
+		if act.Once {
+			return
+		}
 	}
 }
 
 func jobRest(act Action, recs []Record) {
+	allAddreses := genAllAddress(recs)
 	if len(act.URL) == 0 {
 		log.Println("ERROR ACTION : rest \"url\" not set!")
 		return
@@ -121,24 +121,7 @@ func jobRest(act Action, recs []Record) {
 		log.Println("ERROR ACTION : rest \"method\" not set!")
 		return
 	}
-	if act.HttpMethod == "GET" {
-		for _, rec := range recs {
-			url := formatTemplate(act.URL, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl})
-			_, err := http.Get(url)
-			if err != nil {
-				log.Printf("ERROR rest: %s", err.Error())
-				return
-			}
-		}
-		return
-	}
-	if len(act.Data) == 0 {
-		log.Println("ERROR ACTION : rest \"data\" not set!")
-		return
-	}
 	var client *http.Client
-
-	log.Printf("act.HttpSkipTls %t", act.HttpSkipTls)
 	if act.HttpSkipTls {
 		transport := &http.Transport{}
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -146,25 +129,44 @@ func jobRest(act Action, recs []Record) {
 	} else {
 		client = &http.Client{}
 	}
-
 	for _, rec := range recs {
-		data := []byte(formatTemplate(act.Data, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl}))
-		log.Printf("req : %s", data)
-		req, err := http.NewRequest(act.HttpMethod, act.URL, bytes.NewBuffer(data))
+		var req *http.Request
+		var err error
+		if act.HttpMethod == "GET" {
+			escurl := formatTemplate(act.URL, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl, AllAddress: url.QueryEscape(allAddreses)})
+			req, err = http.NewRequest(act.HttpMethod, escurl, nil)
+		} else {
+			data := []byte(formatTemplate(act.Data, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl, AllAddress: allAddreses}))
+			req, err = http.NewRequest(act.HttpMethod, act.URL, bytes.NewBuffer(data))
+			req.Header.Set("Content-Type", "application/json")
+		}
+
 		if err != nil {
 			log.Printf("ERROR rest in prepare request: %s", err.Error())
 			return
 		}
-		req.Header.Set("Content-Type", "application/json")
+
 		if (len(act.HttpBasicAuthLogin) != 0) || (len(act.HttpBasicAuthPass) != 0) {
 			req.SetBasicAuth(act.HttpBasicAuthLogin, act.HttpBasicAuthPass)
 		}
 		_, errr := client.Do(req)
+		//FIX ME! при ошибке выпадет вверх не отработав остальные записи
 		if errr != nil {
 			log.Printf("ERROR rest: %s", errr.Error())
 			return
 		}
+		if act.Once {
+			return
+		}
 	}
+}
+
+func genAllAddress(recs []Record) string {
+	sl := make([]string, 0)
+	for _, rec := range recs {
+		sl = append(sl, rec.Address)
+	}
+	return strings.Join(sl, ",")
 }
 
 func formatTemplate(s string, v interface{}) string {
