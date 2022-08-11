@@ -28,6 +28,10 @@ func (r *Resolver) Resolve(req *dns.Msg, up *Upstream) (res *dns.Msg, rtt time.D
 		{
 			resp, rttime, ns, e = r.resolveCycle(req, up)
 		}
+	case "sequence":
+		{
+			resp, rttime, ns, e = r.resolveSequence(req, up)
+		}
 	default:
 		{
 			resp, rttime, ns, e = r.resolveRandom(req, up)
@@ -37,11 +41,33 @@ func (r *Resolver) Resolve(req *dns.Msg, up *Upstream) (res *dns.Msg, rtt time.D
 }
 
 // Запрос через 1 случайный upstream
-func (r *Resolver) resolveRandom(req *dns.Msg, up *Upstream) (res *dns.Msg, rtt time.Duration, nameserver string, err error) {
+func (r *Resolver) resolveRandom(req *dns.Msg, up *Upstream) (*dns.Msg, time.Duration, string, error) {
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
 	ns := up.NServers[randGen.Intn(len(up.NServers))]
 	resp, rtt, er := r.resolveSingle(req, ns)
 	return resp, rtt, ns, er
+}
+
+// Запрос через первый, в случае ошибки запрос через следующий пока не кончится список upstream
+func (r *Resolver) resolveSequence(req *dns.Msg, up *Upstream) (*dns.Msg, time.Duration, string, error) {
+	var resp *dns.Msg
+	var rtt time.Duration
+	var ns string
+	var err error
+	var rtt_temp time.Duration
+	rtt_temp = 0
+	for i := 0; i < len(up.NServers); i++ {
+		ns = up.NServers[i]
+		var errr error
+		resp, rtt_temp, errr = r.resolveSingle(req, ns)
+		rtt = rtt_temp + rtt
+		if errr == nil {
+			err = errr
+			break
+		}
+	}
+
+	return resp, rtt, ns, err
 }
 
 // Взять ns по счетчику, увиличить счетчик
