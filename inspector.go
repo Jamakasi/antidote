@@ -1,4 +1,4 @@
-package antidote
+package main
 
 import (
 	"github.com/miekg/dns"

@@ -1,4 +1,4 @@
-package antidote
+package main
 
 import (
 	"encoding/json"
@@ -88,6 +88,7 @@ type Upstream struct {
 type Server struct {
 	UpstreamBad  Upstream  `json:"upstream_bad"`
 	UpstreamGood Upstream  `json:"upstream_good"`
+	Parallel     bool      `json:"parallel"`
 	Targets      []Targets `json:"targets"`
 }
 

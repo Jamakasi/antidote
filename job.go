@@ -1,4 +1,4 @@
-package antidote
+package main
 
 import (
 	"bytes"

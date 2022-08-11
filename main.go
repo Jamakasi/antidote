@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/miekg/dns"
-	"github.com/Jamakasi/antidote"
 )
 
 // cmd args
@@ -26,9 +25,9 @@ func startServer(net string, address string) {
 
 func main() {
 	flag.Parse()
-	configuration := antidote.ReadConfig(*configFile)
+	configuration := ReadConfig(*configFile)
 
-	dns.HandleFunc(".", antidote.ServerHandler(configuration))
+	dns.HandleFunc(".", ServerHandler(configuration))
 
 	go startServer("udp", *listenAddr)
 	//FIXME ANY query work over tcp

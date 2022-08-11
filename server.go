@@ -1,7 +1,8 @@
-package antidote
+package main
 
 import (
 	"log"
+	"sync"
 	"time"
 
 	"github.com/miekg/dns"
@@ -21,25 +22,78 @@ func ServerHandler(config *Config) Handler {
 				dns.TypeToString[q.Qtype],
 				q.Name, nameserver)
 		}*/
-		//resolve
-		resp_bad, rtt_bad, ns_bad, err_bad := (new(Resolver)).Resolve(req, &config.Server.UpstreamBad)
-		//stop if errors
-		if checkErrors(w, req, resp_bad, ns_bad, err_bad) {
+		if config.Server.Parallel {
+			parallel(w, req, &config.Server)
+		} else {
+			sequence(w, req, &config.Server)
+		}
+		log.Println("end handler")
+	} // end of handler
+}
+
+func parallel(w dns.ResponseWriter, req *dns.Msg, server *Server) {
+	type Result struct {
+		ans  *dns.Msg
+		rtt  time.Duration
+		ns   string
+		err  error
+		good bool
+	}
+	wg := new(sync.WaitGroup)
+	var results = make(chan *Result)
+
+	wg.Add(1)
+	go func(reqq *dns.Msg, up *Upstream, wg *sync.WaitGroup, result chan<- *Result) {
+		defer wg.Done()
+		resp, rtt, ns, er := (new(Resolver)).Resolve(reqq, up)
+		result <- &Result{ans: resp, rtt: rtt, ns: ns, err: er, good: false}
+	}(req, &server.UpstreamBad, wg, results)
+	wg.Add(1)
+	go func(reqq *dns.Msg, up *Upstream, wg *sync.WaitGroup, result chan<- *Result) {
+		defer wg.Done()
+		resp, rtt, ns, er := (new(Resolver)).Resolve(reqq, up)
+		result <- &Result{ans: resp, rtt: rtt, ns: ns, err: er, good: true}
+	}(req, &server.UpstreamGood, wg, results)
+
+	var good_result, bad_result *Result
+	for result := range results {
+		if !result.good {
+			bad_result = result
+		} else {
+			good_result = result
+		}
+	}
+	if checkErrors(w, req, bad_result.ans, bad_result.ns, bad_result.err) {
+		return
+	}
+	if !isPoisoned(bad_result.ans, server.Targets) {
+		sendResponse(w, bad_result.ans, bad_result.rtt, bad_result.ns, bad_result.err)
+	} else {
+		if checkErrors(w, req, good_result.ans, good_result.ns, good_result.err) {
 			return
 		}
-		if !isPoisoned(resp_bad, config.Server.Targets) {
-			sendResponse(w, resp_bad, rtt_bad, ns_bad, err_bad)
-		} else {
-			resp_good, rtt_good, ns_good, err_good := (new(Resolver)).Resolve(req, &config.Server.UpstreamGood)
-			//stop if errors
-			if checkErrors(w, req, resp_good, ns_good, err_good) {
-				return
-			}
-			sendResponse(w, resp_good, rtt_good, ns_good, err_good)
-			(new(Job)).RunActions(resp_good, &config.Server)
+		sendResponse(w, good_result.ans, good_result.rtt, good_result.ns, good_result.err)
+		(new(Job)).RunActions(good_result.ans, server)
+	}
+}
+func sequence(w dns.ResponseWriter, req *dns.Msg, server *Server) {
+	//resolve
+	resp_bad, rtt_bad, ns_bad, err_bad := (new(Resolver)).Resolve(req, &server.UpstreamBad)
+	//stop if errors
+	if checkErrors(w, req, resp_bad, ns_bad, err_bad) {
+		return
+	}
+	if !isPoisoned(resp_bad, server.Targets) {
+		sendResponse(w, resp_bad, rtt_bad, ns_bad, err_bad)
+	} else {
+		resp_good, rtt_good, ns_good, err_good := (new(Resolver)).Resolve(req, &server.UpstreamGood)
+		//stop if errors
+		if checkErrors(w, req, resp_good, ns_good, err_good) {
+			return
 		}
-
-	} // end of handler
+		sendResponse(w, resp_good, rtt_good, ns_good, err_good)
+		(new(Job)).RunActions(resp_good, server)
+	}
 }
 
 func checkErrors(w dns.ResponseWriter, req *dns.Msg, resp *dns.Msg, ns string, err error) bool {

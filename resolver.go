@@ -1,7 +1,9 @@
-package antidote
+package main
 
 import (
+	"log"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/miekg/dns"
@@ -10,16 +12,13 @@ import (
 type Resolver struct {
 }
 
-func (r *Resolver) Resolve(req *dns.Msg, up *Upstream) (res *dns.Msg, rtt time.Duration, nameserver string, err error) {
-	strategy := "random"
+func (r *Resolver) Resolve(req *dns.Msg, up *Upstream) (*dns.Msg, time.Duration, string, error) {
 	var resp *dns.Msg
 	var rttime time.Duration
 	var e error
 	var ns string
-	if len(up.Strategy) != 0 {
-		strategy = up.Strategy
-	}
-	switch strategy {
+
+	switch up.Strategy {
 	case "random":
 		{
 			resp, rttime, ns, e = r.resolveRandom(req, up)
@@ -31,6 +30,10 @@ func (r *Resolver) Resolve(req *dns.Msg, up *Upstream) (res *dns.Msg, rtt time.D
 	case "sequence":
 		{
 			resp, rttime, ns, e = r.resolveSequence(req, up)
+		}
+	case "parallel":
+		{
+			resp, rttime, ns, e = r.resolveParallel(req, up)
 		}
 	default:
 		{
@@ -70,8 +73,42 @@ func (r *Resolver) resolveSequence(req *dns.Msg, up *Upstream) (*dns.Msg, time.D
 	return resp, rtt, ns, err
 }
 
+// Параллельный запрос через все upstream. Возврат первого быстрейшего без ошибок
+func (r *Resolver) resolveParallel(req *dns.Msg, up *Upstream) (*dns.Msg, time.Duration, string, error) {
+	type Result struct {
+		ans *dns.Msg
+		rtt time.Duration
+		ns  string
+		err error
+	}
+	wg := new(sync.WaitGroup)
+	var results = make(chan Result)
+	for _, ns := range up.NServers {
+		wg.Add(1)
+		go func(req *dns.Msg, ns string, wg *sync.WaitGroup, result chan<- Result) {
+			defer wg.Done()
+			resp, rtt, er := r.resolveSingle(req, ns)
+			result <- Result{ans: resp, rtt: rtt, ns: ns, err: er}
+		}(req, ns, wg, results)
+	}
+	var result Result
+	for res := range results {
+		if res.err == nil {
+			result = res
+			go func() {
+				for res := range results {
+					//noop, hack to correct close unneeded goroutines
+					log.Printf("unneeded routine end %s , %d ms", res.ns, res.rtt/1e6)
+				}
+			}()
+			break
+		}
+	}
+	return result.ans, result.rtt, result.ns, result.err
+}
+
 // Взять ns по счетчику, увиличить счетчик
-func (r *Resolver) resolveCycle(req *dns.Msg, up *Upstream) (res *dns.Msg, rtt time.Duration, nameserver string, err error) {
+func (r *Resolver) resolveCycle(req *dns.Msg, up *Upstream) (*dns.Msg, time.Duration, string, error) {
 	up.CycleMutex.Lock()
 	curr := up.CycleCurrent
 	if up.CycleCurrent >= len(up.NServers)-1 {
@@ -85,7 +122,7 @@ func (r *Resolver) resolveCycle(req *dns.Msg, up *Upstream) (res *dns.Msg, rtt t
 	return resp, rtt, ns, er
 }
 
-func (r *Resolver) resolveSingle(req *dns.Msg, nameserver string) (res *dns.Msg, rtt time.Duration, err error) {
+func (r *Resolver) resolveSingle(req *dns.Msg, nameserver string) (*dns.Msg, time.Duration, error) {
 	c := new(dns.Client)
 	c.Net = "udp"
 	return c.Exchange(req, nameserver)
