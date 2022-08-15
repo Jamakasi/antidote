@@ -27,7 +27,6 @@ func ServerHandler(config *Config) Handler {
 		} else {
 			sequence(w, req, &config.Server)
 		}
-		log.Println("end handler")
 	} // end of handler
 }
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -96,10 +95,11 @@ func (r *Resolver) resolveParallel(req *dns.Msg, up *Upstream) (*dns.Msg, time.D
 		if res.err == nil {
 			result = res
 			go func() {
-				for res := range results {
+				<-results
+				/*for res := range results {
 					//noop, hack to correct close unneeded goroutines
-					log.Printf("unneeded routine end %s , %d ms", res.ns, res.rtt/1e6)
-				}
+					//log.Printf("unneeded routine end %s , %d ms", res.ns, res.rtt/1e6)
+				}*/
 			}()
 			break
 		}

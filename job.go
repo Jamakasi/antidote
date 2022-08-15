@@ -56,6 +56,12 @@ func (j *Job) RunActions(ans *dns.Msg, server *Server) {
 			data := j.collectAnswers(ans, dns.TypeAAAA)
 			j.doActions(target.Actions, data)
 		}
+		if len(target.HTTP_REDIRECT_TEST) != 0 {
+			dataA := j.collectAnswers(ans, dns.TypeA)
+			dataAAAA := j.collectAnswers(ans, dns.TypeAAAA)
+			dataA = append(dataA, dataAAAA...)
+			j.doActions(target.Actions, dataA)
+		}
 	}
 }
 

@@ -75,9 +75,10 @@ type Action struct {
 	URL                string `json:"url,omitempty"`
 }
 type Targets struct {
-	A       []string `json:"A,omitempty"`
-	AAAA    []string `json:"AAAA,omitempty"`
-	Actions []Action `json:"actions"`
+	A                  []string `json:"A,omitempty"`
+	AAAA               []string `json:"AAAA,omitempty"`
+	HTTP_REDIRECT_TEST []string `json:"HTTP_REDIRECT_TEST,omitempty"`
+	Actions            []Action `json:"actions"`
 }
 type Upstream struct {
 	NServers     []string   `json:"ns"`
