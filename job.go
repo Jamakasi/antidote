@@ -20,6 +20,7 @@ type Record struct {
 	RecType uint16
 	Address string
 	Ttl     uint32
+	Error   string
 }
 
 // see dnstype dns.Type
@@ -103,12 +104,15 @@ func (j *Job) doActions(actions []Action, recs []Record) {
 	}
 }
 
+/*
+Вывод в лог.
+*/
 func jobLog(act Action, recs []Record) {
 	allAddreses := genAllAddress(recs)
 	for _, rec := range recs {
-		str := formatTemplate("{{.Domain}} {{.Address}} {{.Ttl}}", &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl, AllAddress: allAddreses})
+		str := formatTemplate("{{.Domain}} {{.Address}} {{.Ttl}}", rec, allAddreses)
 		if len(act.STR) != 0 {
-			str = formatTemplate(act.STR, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl, AllAddress: allAddreses})
+			str = formatTemplate(act.STR, rec, allAddreses)
 		}
 		log.Println(str)
 		if act.Once {
@@ -117,8 +121,14 @@ func jobLog(act Action, recs []Record) {
 	}
 }
 
-func jobRest(act Action, recs []Record) {
+/*
+Выполнить rest запрос.
+Может вернуть массив зафейленных запросов.
+Вернет nil если ошибок нет, в противном случае массив записей с ошибками для отработки цепочки action при ошибке
+*/
+func jobRest(act Action, recs []Record) []Record {
 	allAddreses := genAllAddress(recs)
+	errRecs := make([]Record, 0)
 	if len(act.URL) == 0 {
 		log.Println("ERROR ACTION : rest \"url\" not set!")
 		return
@@ -139,10 +149,10 @@ func jobRest(act Action, recs []Record) {
 		var req *http.Request
 		var err error
 		if act.HttpMethod == "GET" {
-			escurl := formatTemplate(act.URL, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl, AllAddress: url.QueryEscape(allAddreses)})
+			escurl := formatTemplate(act.URL, rec, url.QueryEscape(allAddreses))
 			req, err = http.NewRequest(act.HttpMethod, escurl, nil)
 		} else {
-			data := []byte(formatTemplate(act.Data, &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl, AllAddress: allAddreses}))
+			data := []byte(formatTemplate(act.Data, rec, allAddreses))
 			req, err = http.NewRequest(act.HttpMethod, act.URL, bytes.NewBuffer(data))
 			req.Header.Set("Content-Type", "application/json")
 		}
@@ -175,18 +185,16 @@ func genAllAddress(recs []Record) string {
 	return strings.Join(sl, ",")
 }
 
-func formatTemplate(s string, v interface{}) string {
+func formatTemplate(s string, rec Record, allAddreses string) string {
+	v := &VarTemplate{Domain: rec.Domain, Address: rec.Address, Ttl: rec.Ttl, AllAddress: allAddreses, PrevError: rec.Error}
 	strbuild := new(strings.Builder)
 	tmpl, err := template.New("test").Parse(s)
 	if err != nil {
-		log.Printf("Error formatTemplate parse %s %s : %s", s, v, err.Error())
+		log.Printf("Error formatTemplate parse %s %v : %s", s, v, err.Error())
 	}
 	err = tmpl.Execute(strbuild, v)
 	if err != nil {
-		log.Printf("Error formatTemplate parse %s %s : %s", s, v, err.Error())
+		log.Printf("Error formatTemplate parse %s %v : %s", s, v, err.Error())
 	}
 	return strbuild.String()
-	/*t, b := new(template.Template), new(strings.Builder)
-	template.Must(t.Parse(s)).Execute(b, v)
-	return b.String()*/
 }

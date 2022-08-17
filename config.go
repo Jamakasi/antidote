@@ -52,6 +52,7 @@ type VarTemplate struct {
 	Address    string
 	Ttl        uint32
 	AllAddress string
+	PrevError  string
 }
 
 type Config struct {
@@ -59,9 +60,10 @@ type Config struct {
 }
 type Action struct {
 	//может быть у любого
-	Type    string   `json:"type"`
-	Actions []Action `json:"actions,omitempty"`
-	Once    bool     `json:"once,omitempty"`
+	Type         string   `json:"type"`
+	Actions      []Action `json:"actions,omitempty"`
+	ErrorActions []Action `json:"errorActions,omitempty"`
+	Once         bool     `json:"once,omitempty"`
 	//terminal
 	Cmd string `json:"cmd,omitempty"`
 	//log
