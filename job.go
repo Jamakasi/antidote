@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -96,9 +97,12 @@ func (j *Job) doActions(actions []Action, recs []Record) {
 				j.doActions(action.Actions, recs)
 			}
 		case "rest":
-			jobRest(action, recs)
-			if len(action.Actions) != 0 {
-				j.doActions(action.Actions, recs)
+			okR, erR := jobRest(action, recs)
+			if okR != nil && len(action.Actions) != 0 {
+				j.doActions(action.Actions, okR)
+			}
+			if erR != nil && len(action.ErrorActions) != 0 {
+				j.doActions(action.ErrorActions, erR)
 			}
 		}
 	}
@@ -123,19 +127,34 @@ func jobLog(act Action, recs []Record) {
 
 /*
 Выполнить rest запрос.
-Может вернуть массив зафейленных запросов.
-Вернет nil если ошибок нет, в противном случае массив записей с ошибками для отработки цепочки action при ошибке
+Возвращает успешные и неуспешные Records. В случае отсутсвия nil
+Заполняет поле Error ошибкой
 */
-func jobRest(act Action, recs []Record) []Record {
+func jobRest(act Action, recs []Record) ([]Record, []Record) {
 	allAddreses := genAllAddress(recs)
 	errRecs := make([]Record, 0)
+	okRecs := make([]Record, 0)
 	if len(act.URL) == 0 {
-		log.Println("ERROR ACTION : rest \"url\" not set!")
-		return
+		return nil, func(r []Record, s string) []Record {
+			result := make([]Record, 0)
+			for _, rec := range recs {
+				r := rec //copy
+				r.Error = s
+				result = append(result, r)
+			}
+			return result
+		}(recs, "rest \"url\" not set!")
 	}
 	if len(act.HttpMethod) == 0 {
-		log.Println("ERROR ACTION : rest \"method\" not set!")
-		return
+		return nil, func(r []Record, s string) []Record {
+			result := make([]Record, 0)
+			for _, rec := range recs {
+				r := rec //copy
+				r.Error = s
+				result = append(result, r)
+			}
+			return result
+		}(recs, "rest \"method\" not set!")
 	}
 	var client *http.Client
 	if act.HttpSkipTls {
@@ -158,23 +177,51 @@ func jobRest(act Action, recs []Record) []Record {
 		}
 
 		if err != nil {
-			log.Printf("ERROR rest in prepare request: %s", err.Error())
-			return
+			//log.Printf("ERROR rest in prepare request: %s", err.Error())
+			return nil, func(r []Record, s string) []Record {
+				result := make([]Record, 0)
+				for _, rec := range recs {
+					r := rec //copy
+					r.Error = s
+					result = append(result, r)
+				}
+				return result
+			}(recs, err.Error())
 		}
 
 		if (len(act.HttpBasicAuthLogin) != 0) || (len(act.HttpBasicAuthPass) != 0) {
 			req.SetBasicAuth(act.HttpBasicAuthLogin, act.HttpBasicAuthPass)
 		}
-		_, errr := client.Do(req)
-		//FIX ME! при ошибке выпадет вверх не отработав остальные записи
+		responce, errr := client.Do(req)
 		if errr != nil {
-			log.Printf("ERROR rest: %s", errr.Error())
-			return
+			//log.Printf("ERROR rest: %s", errr.Error())
+			r := rec //copy
+			r.Error = errr.Error()
+			errRecs = append(errRecs, r)
+		} else {
+			defer responce.Body.Close()
+			if responce.StatusCode == http.StatusOK {
+				okRecs = append(okRecs, rec)
+			} else {
+				r := rec //copy
+				bodyBytes, err := io.ReadAll(responce.Body)
+				if err != nil {
+					log.Fatal(err)
+				}
+				if err != nil {
+					r.Error = responce.Status + "read body error"
+				} else {
+					r.Error = responce.Status + string(bodyBytes)
+				}
+				errRecs = append(errRecs, r)
+			}
+
 		}
 		if act.Once {
-			return
+			return okRecs, errRecs
 		}
 	}
+	return okRecs, errRecs
 }
 
 func genAllAddress(recs []Record) string {
