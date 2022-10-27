@@ -244,3 +244,6 @@ listen адрес:порт (по умолчанию localhost:8053)
 	"url" : "https://ntfy.sh/dns/publish?message={{.Domain}}+{{.AllAddress}}&priority=min&tags=+1"
 }
 ```
+
+
+
