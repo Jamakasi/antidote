@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"sync"
 )
 
 /*
@@ -47,52 +46,18 @@ import (
  }
 */
 
-type VarTemplate struct {
-	Domain     string
-	Address    string
-	Ttl        uint32
-	AllAddress string
-	PrevError  string
-}
-
 type Config struct {
 	Server Server `json:"server"`
 }
-type Action struct {
-	//может быть у любого
-	Type         string   `json:"type"`
-	Actions      []Action `json:"actions,omitempty"`
-	ErrorActions []Action `json:"errorActions,omitempty"`
-	Once         bool     `json:"once,omitempty"`
-	//terminal
-	Cmd string `json:"cmd,omitempty"`
-	//log
-	STR string `json:"str,omitempty"`
-	//rest
-	HttpMethod         string `json:"method,omitempty"`
-	HttpSkipTls        bool   `json:"skiptls,omitempty"`
-	HttpBasicAuthLogin string `json:"login,omitempty"`
-	HttpBasicAuthPass  string `json:"password,omitempty"`
-	Data               string `json:"data,omitempty"`
-	URL                string `json:"url,omitempty"`
-}
-type Targets struct {
-	A                  []string `json:"A,omitempty"`
-	AAAA               []string `json:"AAAA,omitempty"`
-	HTTP_REDIRECT_TEST []string `json:"HTTP_REDIRECT_TEST,omitempty"`
-	Actions            []Action `json:"actions"`
-}
-type Upstream struct {
-	NServers     []string   `json:"ns"`
-	Strategy     string     `json:"strategy,omitempty"`
-	CycleMutex   sync.Mutex // mytex для циклической стратегии
-	CycleCurrent int        // указатель на текущий сервер для циклической стратегии
+type RawJsonAction struct {
+	Type      string            `json:"type"`
+	params    json.RawMessage   `json:"params"`
+	onSuccess []json.RawMessage `json:"onSuccess,omitempty"`
+	onError   []json.RawMessage `json:"onError,omitempty"`
+	onFail    []json.RawMessage `json:"onFail,omitempty"`
 }
 type Server struct {
-	UpstreamBad  Upstream  `json:"upstream_bad"`
-	UpstreamGood Upstream  `json:"upstream_good"`
-	Parallel     bool      `json:"parallel"`
-	Targets      []Targets `json:"targets"`
+	Ingress RawJsonAction `json:"Ingress"`
 }
 
 func ReadConfig(filename string) *Config {

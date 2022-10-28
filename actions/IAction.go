@@ -1,13 +1,27 @@
 package actions
 
 import (
+	"encoding/json"
+
 	"github.com/miekg/dns"
 )
 
 type IAction interface {
-	onSuccess() string
-	onError() string
-	onFail() string
+	run()
+	parseParams(raw json.RawMessage) IAction
+}
+
+type Action struct {
+	Type      string          `json:"type"`
+	params    json.RawMessage `json:"params"`
+	onSuccess []Action        `json:"onSuccess,omitempty"`
+	onError   []Action        `json:"onError,omitempty"`
+	onFail    []Action        `json:"onFail,omitempty"`
+}
+
+func (a *Action) run() {
+}
+func (a *Action) parseParams(raw json.RawMessage) IAction {
 }
 
 type DData struct {
