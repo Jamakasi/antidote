@@ -7,7 +7,7 @@
             "request": "launch",
             "mode": "debug",
             "program": "${fileDirname}",
-            "args": ["-config","../antidote-private/antidote.json"]
+            "args": ["-config","antidote.json"]
         }
     ]
 }

@@ -89,10 +89,17 @@ type Upstream struct {
 	CycleCurrent int        // указатель на текущий сервер для циклической стратегии
 }
 type Server struct {
-	UpstreamBad  Upstream  `json:"upstream_bad"`
-	UpstreamGood Upstream  `json:"upstream_good"`
-	Parallel     bool      `json:"parallel"`
-	Targets      []Targets `json:"targets"`
+	UpstreamBad  Upstream     `json:"upstream_bad"`
+	UpstreamGood Upstream     `json:"upstream_good"`
+	Parallel     bool         `json:"parallel"`
+	Targets      []Targets    `json:"targets"`
+	Plug         []PluginBase `json:"plugins"`
+}
+
+func (s *Server) initPlugins() {
+	for i := 0; i < len(s.Plug); i++ {
+		s.Plug[i].initPluginsRecursive()
+	}
 }
 
 func ReadConfig(filename string) *Config {
@@ -105,13 +112,7 @@ func ReadConfig(filename string) *Config {
 	if err := json.Unmarshal(file, &jsonConfig); err != nil {
 		log.Fatalf("Cannot parse the configuration: %s", err)
 	}
+	jsonConfig.Server.initPlugins()
 
-	// Safety checks
-	/*if len(jsonConfig.Server.UpstreamGood) == 0 {
-		log.Fatal("Configuration contains no 'dns_good' section")
-	}
-	if len(jsonConfig.Server.UpstreamBad) == 0 {
-		log.Fatal("Configuration contains no 'dns_bad' section")
-	}*/
 	return &jsonConfig
 }

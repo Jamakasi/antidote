@@ -22,14 +22,19 @@ func ServerHandler(config *Config) Handler {
 				dns.TypeToString[q.Qtype],
 				q.Name, nameserver)
 		}*/
-		if config.Server.Parallel {
+		/*if config.Server.Parallel {
 			parallel(w, req, &config.Server)
 		} else {
 			sequence(w, req, &config.Server)
-		}
+		}*/
+		toPlugins(w, req, &config.Server)
 	} // end of handler
 }
-
+func toPlugins(w dns.ResponseWriter, req *dns.Msg, server *Server) {
+	for _, next := range server.Plug {
+		next.do(w, req)
+	}
+}
 func parallel(w dns.ResponseWriter, req *dns.Msg, server *Server) {
 	type Result struct {
 		ans  *dns.Msg

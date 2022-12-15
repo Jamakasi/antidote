@@ -1,75 +1,37 @@
  {
 	"server": {
-	"parallel": false,
-	"upstream_bad" : {
-		"ns": ["94.140.14.14:53","94.140.15.15:53"],
-		"strategy": "parallel"
-	},
-	"upstream_good" : {
-		"ns": ["8.8.8.8:53" , "8.8.4.4:53"],
-		"strategy": "parallel"
-	},
-	"targets": [
-		{
-		"A": ["188.186.146.208", "188.186.146.207", "188.186.154.88", "188.186.154.79", "188.186.157.49"],
-		"actions" : [
-			{
-			"type" : "log",
-			"once": true,
-			"str" : "oncelog  {{.Domain}} {{.AllAddress}} {{.Ttl}} ",
-			"actions" : [
-				{
-				"type" : "rest",
-				"method" : "GET",
-				"once": true,
-				"login" : "hide",
-				"password" : "hide",
-				"url" : "https://ntfy.sh/dns/publish?message={{.Domain}}+{{.AllAddress}}&priority=min&tags=+1"
-				},
-				{
-				"type" : "rest",
-				"skiptls": true,
-				"method" : "PUT",
-				"login" : "hide",
-				"password" : "hide",
-				"data" : "{\"address\":\"{{.Address}}\",\"comment\":\"{{.Domain}}\",\"list\": \"test-list\", \"timeout\":\"{{.Ttl}}\" }",
-				"url" : "https://192.168.88.1:4438/rest/ip/firewall/address-list",
-				"errorActions": [
-					{
-						"type" : "log",
-						"once": true,
-						"str" : "Unable to add {{.Domain}} {{.AllAddress}} {{.Ttl}} {{.Ttl}} {{.PrevError}}"
-					}
-				]
-				}
-			]
-			}
-		]
+		"parallel": false,
+		"upstream_bad" : {
+			"ns": ["94.140.14.14:53","94.140.15.15:53"],
+			"strategy": "parallel"
 		},
-		{
-		"AAAA": ["2a01:54e0:fb00::301"],
-		"actions" : [
+		"upstream_good" : {
+			"ns": ["8.8.8.8:53" , "8.8.4.4:53"],
+			"strategy": "parallel"
+		},
+		"plugins": 
+		[
 			{
 			"type" : "log",
-			"str" : "AAAA {{.Domain}} {{.Address}} {{.Ttl}}",
-			"actions" : [
+			"config":{
+				"message": "test"
+			},
+			"plugins": [
 				{
-				"type" : "log",
-				"once": true,
-				"str" : "oncelog  {{.Domain}} {{.AllAddress}} {{.Ttl}} "
+					"type" : "log",
+					"config":{
+						"message": "test a"
+					}
 				},
 				{
-				"type" : "rest",
-				"method" : "GET",
-				"once": true,
-				"login" : "hide",
-				"password" : "hide",
-				"url" : "https://ntfy.sh/dns/publish?message={{.Domain}}+{{.AllAddress}}&priority=min&tags=+1"
+					"type" : "log",
+					"config":{
+						"message": "test b"
+					}
 				}
 			]
+
 			}
 		]
-		}
-	]
 	}
  }
