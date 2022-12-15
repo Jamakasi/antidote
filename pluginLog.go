@@ -9,18 +9,29 @@ import (
 
 type PluginLog struct {
 	Message string
+	Once    bool
 }
 
-func (p *PluginLog) init(data []byte) PluginIface {
-	var plog PluginLog
-	if err := json.Unmarshal(data, &plog); err != nil {
-		plog = PluginLog{}
+func (p *PluginLog) init(data []byte) {
+	if err := json.Unmarshal(data, &p); err != nil {
 	}
-	if len(plog.Message) == 0 {
-		plog.Message = "{{.Domain}} {{.Address}} {{.Ttl}}"
+	if len(p.Message) == 0 {
+		p.Message = "{{.QDomain}} {{.QType}} {{.QClass}}\n"
 	}
-	return p
 }
-func (p *PluginLog) process(w dns.ResponseWriter, req *dns.Msg) {
-	fmt.Println(p.Message)
+func (p *PluginLog) process(data *Data) error {
+	recs := data.collectAnswersAll()
+	v := &TemplateVars{QDomain: data.getQDomain(), QType: data.getQType(), QClass: data.getQClass(),
+		AAllAddress: data.appendAddresses(recs)}
+	if p.Once {
+		fmt.Println(FormatString(p.Message, v))
+	} else {
+		for _, rec := range recs {
+			v.AAddress = rec.Address
+			v.ATtl = rec.Ttl
+			v.AType = dns.TypeToString[rec.RecType]
+			fmt.Println(FormatString(p.Message, v))
+		}
+	}
+	return nil
 }

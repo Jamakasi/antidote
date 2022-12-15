@@ -6,17 +6,7 @@ import (
 	"html/template"
 	"log"
 	"strings"
-
-	"github.com/miekg/dns"
 )
-
-// data
-type Data struct {
-	message *dns.Msg
-	w       dns.ResponseWriter
-}
-
-func (d *Data) getQ()
 
 // Abstract plugin
 type PluginBase struct {
@@ -27,18 +17,22 @@ type PluginBase struct {
 	ErrorPlugins []*PluginBase   `json:"errorPlugins,omitempty"`
 }
 type PluginIface interface {
-	init(data []byte) PluginIface
-	process(w dns.ResponseWriter, req *dns.Msg)
+	init(data []byte)
+	process(data *Data) error
 }
 
-func (p *PluginBase) do(w dns.ResponseWriter, req *dns.Msg) {
-	p.pInstance.process(w, req)
-	for _, next := range p.Plugins {
-		next.do(w, req)
+func (p *PluginBase) do(data *Data) {
+	err := p.pInstance.process(data)
+	if err != nil {
+		for _, next := range p.Plugins {
+			next.do(data)
+		}
+	} else {
+		for _, next := range p.ErrorPlugins {
+			next.do(data)
+		}
 	}
-	for _, next := range p.ErrorPlugins {
-		next.do(w, req)
-	}
+
 }
 
 // Рекусрвиная инициализация плагинов.
@@ -47,14 +41,21 @@ func (p *PluginBase) initPluginsRecursive() {
 	switch p.Type {
 	case "log":
 		{
-			/*var plog PluginLog
-			if err := json.Unmarshal(p.RawData, &plog); err != nil {
-				//log.Fatalf("Cannot parse the configuration: %s", err)
-				plog = PluginLog{}
-			}*/
-			plog := PluginLog{}
-			plog.init(p.RawData)
-			p.pInstance = &plog
+			plug := PluginLog{}
+			plug.init(p.RawData)
+			p.pInstance = &plug
+		}
+	case "rest":
+		{
+			plug := PluginRest{}
+			plug.init(p.RawData)
+			p.pInstance = &plug
+		}
+	case "dummy":
+		{
+			plug := PluginDummy{}
+			plug.init(p.RawData)
+			p.pInstance = &plug
 		}
 	default:
 		{
@@ -70,25 +71,28 @@ func (p *PluginBase) initPluginsRecursive() {
 }
 
 // Темплейт
-type TmpTemplate struct {
-	Domain     string
-	Address    string
-	Ttl        uint32
-	AllAddress string
-	PrevError  string
+type TemplateVars struct {
+	QDomain string
+	QType   string
+	QClass  string
+
+	AAddress    string
+	ATtl        uint32
+	AType       string
+	AAllAddress string
 }
 
 // Генерация строки по заданному патерну s
-func FormatString(s string) string {
-	v := &TmpTemplate{}
+// FIXME валится при ошибках в s!!!
+func FormatString(s string, v *TemplateVars) string {
 	strbuild := new(strings.Builder)
 	tmpl, err := template.New("test").Parse(s)
 	if err != nil {
-		log.Printf("Error formatTemplate parse %s %v : %s", s, v, err.Error())
+		log.Printf("Error FormatString prepare %s : %s", s, err.Error())
 	}
 	err = tmpl.Execute(strbuild, v)
 	if err != nil {
-		log.Printf("Error formatTemplate parse %s %v : %s", s, v, err.Error())
+		log.Printf("Error FormatString execute %v : %s", v, err.Error())
 	}
 	return strbuild.String()
 }

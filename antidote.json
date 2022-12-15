@@ -13,9 +13,6 @@
 		[
 			{
 			"type" : "log",
-			"config":{
-				"message": "test"
-			},
 			"plugins": [
 				{
 					"type" : "log",

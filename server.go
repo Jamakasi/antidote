@@ -31,8 +31,9 @@ func ServerHandler(config *Config) Handler {
 	} // end of handler
 }
 func toPlugins(w dns.ResponseWriter, req *dns.Msg, server *Server) {
+	d := &Data{msg: req, w: w}
 	for _, next := range server.Plug {
-		next.do(w, req)
+		next.do(d)
 	}
 }
 func parallel(w dns.ResponseWriter, req *dns.Msg, server *Server) {
@@ -77,7 +78,7 @@ func parallel(w dns.ResponseWriter, req *dns.Msg, server *Server) {
 			return
 		}
 		sendResponse(w, good_result.ans, good_result.rtt, good_result.ns, good_result.err)
-		(new(Job)).RunActions(good_result.ans, server)
+		//(new(Job)).RunActions(good_result.ans, server)
 	}
 }
 func sequence(w dns.ResponseWriter, req *dns.Msg, server *Server) {
@@ -96,7 +97,7 @@ func sequence(w dns.ResponseWriter, req *dns.Msg, server *Server) {
 			return
 		}
 		sendResponse(w, resp_good, rtt_good, ns_good, err_good)
-		(new(Job)).RunActions(resp_good, server)
+		//(new(Job)).RunActions(resp_good, server)
 	}
 }
 
