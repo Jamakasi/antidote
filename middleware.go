@@ -9,26 +9,26 @@ import (
 )
 
 // Abstract plugin
-type PluginBase struct {
-	Type         string          `json:"type"`
-	pInstance    PluginIface     //targed plugin instance
-	RawData      json.RawMessage `json:"config,omitempty"`
-	Plugins      []*PluginBase   `json:"plugins,omitempty"`
-	ErrorPlugins []*PluginBase   `json:"errorPlugins,omitempty"`
+type MiddlewareBase struct {
+	Type      string            `json:"type"`
+	pInstance MiddlewareIface   //targed plugin instance
+	RawData   json.RawMessage   `json:"config,omitempty"`
+	OnOk      []*MiddlewareBase `json:"onok,omitempty"`
+	OnFail    []*MiddlewareBase `json:"onfail,omitempty"`
 }
-type PluginIface interface {
+type MiddlewareIface interface {
 	init(data []byte)
 	process(data *Data) error
 }
 
-func (p *PluginBase) do(data *Data) {
+func (p *MiddlewareBase) do(data *Data) {
 	err := p.pInstance.process(data)
-	if err != nil {
-		for _, next := range p.Plugins {
+	if err == nil {
+		for _, next := range p.OnOk {
 			next.do(data)
 		}
 	} else {
-		for _, next := range p.ErrorPlugins {
+		for _, next := range p.OnFail {
 			next.do(data)
 		}
 	}
@@ -37,23 +37,41 @@ func (p *PluginBase) do(data *Data) {
 
 // Рекусрвиная инициализация плагинов.
 // Передача им куска json с их конфигами
-func (p *PluginBase) initPluginsRecursive() {
+func (p *MiddlewareBase) initPluginsRecursive() {
 	switch p.Type {
 	case "log":
 		{
-			plug := PluginLog{}
+			plug := MLog{}
 			plug.init(p.RawData)
 			p.pInstance = &plug
 		}
 	case "rest":
 		{
-			plug := PluginRest{}
+			plug := MRest{}
+			plug.init(p.RawData)
+			p.pInstance = &plug
+		}
+	case "resolve":
+		{
+			plug := MResolve{}
+			plug.init(p.RawData)
+			p.pInstance = &plug
+		}
+	case "sendResponce":
+		{
+			plug := MSendResponce{}
+			plug.init(p.RawData)
+			p.pInstance = &plug
+		}
+	case "rcontain":
+		{
+			plug := MRContain{}
 			plug.init(p.RawData)
 			p.pInstance = &plug
 		}
 	case "dummy":
 		{
-			plug := PluginDummy{}
+			plug := MDummy{}
 			plug.init(p.RawData)
 			p.pInstance = &plug
 		}
@@ -62,10 +80,10 @@ func (p *PluginBase) initPluginsRecursive() {
 			fmt.Printf("Unknown plugin type: %s\n", p.Type)
 		}
 	}
-	for _, next := range p.Plugins {
+	for _, next := range p.OnOk {
 		next.initPluginsRecursive()
 	}
-	for _, next := range p.ErrorPlugins {
+	for _, next := range p.OnFail {
 		next.initPluginsRecursive()
 	}
 }

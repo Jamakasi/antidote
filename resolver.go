@@ -8,6 +8,13 @@ import (
 	"github.com/miekg/dns"
 )
 
+type Upstream struct {
+	NServers     []string
+	Strategy     string
+	CycleMutex   sync.Mutex // mytex для циклической стратегии
+	CycleCurrent int        // указатель на текущий сервер для циклической стратегии
+}
+
 type Resolver struct {
 }
 

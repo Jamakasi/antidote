@@ -9,7 +9,7 @@ import (
 	"github.com/miekg/dns"
 )
 
-type PluginRest struct {
+type MRest struct {
 	HttpMethod         string `json:"method,omitempty"`
 	HttpSkipTls        bool   `json:"skiptls,omitempty"`
 	HttpBasicAuthLogin string `json:"login,omitempty"`
@@ -20,16 +20,16 @@ type PluginRest struct {
 	Once bool
 }
 
-func (p *PluginRest) init(data []byte) {
+func (p *MRest) init(data []byte) {
 	if err := json.Unmarshal(data, &p); err != nil {
 	}
 }
-func (p *PluginRest) process(data *Data) error {
+func (p *MRest) process(data *Data) error {
 
 	return nil
 }
 
-func (p *PluginRest) getQuerry(data *Data) {
+func (p *MRest) getQuerry(data *Data) {
 	var client *http.Client
 	if p.HttpSkipTls {
 		transport := &http.Transport{}

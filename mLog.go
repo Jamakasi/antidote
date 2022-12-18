@@ -7,19 +7,19 @@ import (
 	"github.com/miekg/dns"
 )
 
-type PluginLog struct {
+type MLog struct {
 	Message string
 	Once    bool
 }
 
-func (p *PluginLog) init(data []byte) {
+func (p *MLog) init(data []byte) {
 	if err := json.Unmarshal(data, &p); err != nil {
 	}
 	if len(p.Message) == 0 {
 		p.Message = "{{.QDomain}} {{.QType}} {{.QClass}}\n"
 	}
 }
-func (p *PluginLog) process(data *Data) error {
+func (p *MLog) process(data *Data) error {
 	recs := data.collectAnswersAll()
 	v := &TemplateVars{QDomain: data.getQDomain(), QType: data.getQType(), QClass: data.getQClass(),
 		AAllAddress: data.appendAddresses(recs)}

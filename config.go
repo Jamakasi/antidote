@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"sync"
 )
 
 /*
@@ -82,18 +81,13 @@ type Targets struct {
 	HTTP_REDIRECT_TEST []string `json:"HTTP_REDIRECT_TEST,omitempty"`
 	Actions            []Action `json:"actions"`
 }
-type Upstream struct {
-	NServers     []string   `json:"ns"`
-	Strategy     string     `json:"strategy,omitempty"`
-	CycleMutex   sync.Mutex // mytex для циклической стратегии
-	CycleCurrent int        // указатель на текущий сервер для циклической стратегии
-}
+
 type Server struct {
-	UpstreamBad  Upstream     `json:"upstream_bad"`
-	UpstreamGood Upstream     `json:"upstream_good"`
-	Parallel     bool         `json:"parallel"`
-	Targets      []Targets    `json:"targets"`
-	Plug         []PluginBase `json:"plugins"`
+	UpstreamBad  Upstream         `json:"upstream_bad"`
+	UpstreamGood Upstream         `json:"upstream_good"`
+	Parallel     bool             `json:"parallel"`
+	Targets      []Targets        `json:"targets"`
+	Plug         []MiddlewareBase `json:"plugins"`
 }
 
 func (s *Server) initPlugins() {

@@ -1,0 +1,33 @@
+ {
+	"server": {
+		"plugins": 
+		[
+			{
+			"type" : "log",
+			"config":{
+				"message": "request : {{.QDomain}} {{.QType}} {{.QClass}}\n"
+			},
+			"onok": [
+				{
+					"type" : "resolve",
+					"config":{
+						"ns": ["8.8.8.8:53" , "8.8.4.4:53"],
+						"strategy": "parallel"
+					},
+					"onok": 
+					[
+						{
+						"type" : "sendResponce"
+						},{
+						"type" : "log",
+						"config":{
+							"message": "resolved : {{.QDomain}} {{.AType}} {{.AAddress}} {{.ATtl}}\n"
+							}
+						}
+					]
+				}
+			]
+			}
+		]
+	}
+ }

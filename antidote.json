@@ -1,33 +1,54 @@
  {
 	"server": {
-		"parallel": false,
-		"upstream_bad" : {
-			"ns": ["94.140.14.14:53","94.140.15.15:53"],
-			"strategy": "parallel"
-		},
-		"upstream_good" : {
-			"ns": ["8.8.8.8:53" , "8.8.4.4:53"],
-			"strategy": "parallel"
-		},
 		"plugins": 
 		[
 			{
 			"type" : "log",
-			"plugins": [
+			"config":{
+				"message": "request : {{.QDomain}} {{.QType}} {{.QClass}}\n"
+			},
+			"onok": [
 				{
-					"type" : "log",
+					"type" : "resolve",
 					"config":{
-						"message": "test a"
-					}
-				},
-				{
-					"type" : "log",
-					"config":{
-						"message": "test b"
-					}
+						"ns": ["8.8.8.8:53" , "8.8.4.4:53"],
+						"strategy": "parallel"
+					},
+					"onok": 
+					[
+						{
+						"type" : "rcontain",
+						"config":{
+							"Names": ["188.186.146.208", "188.186.146.207", "188.186.154.88", "188.186.154.79", "188.186.157.49"],
+							"QType": "A"
+							}
+						,
+						"onok": 
+						[
+							{
+							"type" : "sendResponce"
+							},{
+							"type" : "log",
+							"config":{
+								"message": "hacket : {{.QDomain}} {{.AType}} {{.AAddress}} {{.ATtl}}\n"
+								}
+							}
+						],
+						"onfail":
+						[
+							{
+								"type" : "sendResponce"
+								},{
+								"type" : "log",
+								"config":{
+									"message": "normal : {{.QDomain}} {{.AType}} {{.AAddress}} {{.ATtl}}\n"
+									}
+								}
+						]
+						}
+					]
 				}
 			]
-
 			}
 		]
 	}
